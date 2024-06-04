@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "semantic-space"
-version = "0.0.1"
+version = "0.1.1"
 description = "A basic NLP library for modelization and tokenization."
 authors = ["Ahmet Erdem <ahmetblk1035@gmail.com>"]
 license = "MIT"

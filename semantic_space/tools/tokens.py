@@ -408,7 +408,7 @@ def chunkify(vectors: np.ndarray, start: int, stop: int, remove_special_tokens: 
             # list will be formed as if it were there.
     return np.asarray(collected)
 
-def unorder(tokenlist: List[Union[token16, token32]]) -> Union[uint16 * numerical, uint32 * numerical]:
+def unorder(tokenlist: List[Union[token16, token32]]):
     """
         Turns an ordered set of tokens, to an unordered set of tokens.
 
