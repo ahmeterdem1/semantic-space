@@ -3,8 +3,66 @@
 """
 
 import numpy as np
-from typing import List
+from typing import List, Union, Tuple
 from ..utils.log import logger
+from ..tools.tokens import token16, token32, detokenify
+
+def contexts(tokens: Union[List[Union[token16, token32]], List[int]],
+                  window: int = 3) -> Tuple[List[int], List[int]]:
+    """
+        Match words with their context words given the window size.
+
+        Args:
+            tokens: An ordered token list or a list of integers,
+                representing the token ids.
+
+            window (int): The window size to pick context tokens
+                from. The window goes both forwards and backwards
+                from the current location of an investigated token.
+
+        Returns:
+            A tuple of length 2. First element is the list of tokens
+            ids that are investigated. Second element is alist of
+            lists, each containing corresponding context tokens to
+            the investigated ones in order.
+    """
+    if isinstance(tokens[0], Union[token16, token32]):
+        tokens = detokenify(tokens)
+
+    contexts = {}
+    begin: int
+    end: int
+    N = len(tokens)
+    for i, token in enumerate(tokens):
+        if token not in contexts:
+            contexts[token] = []
+
+        begin = max(0, i - window)
+        end = min(i + window + 1, N)
+
+        for context in tokens[begin:end]:
+            if context == token:
+                continue
+            contexts[token].append(context)
+
+    return list(contexts.keys()), list(contexts.values())
+
+def negatives(vocab_size: int, count: int = 15) -> Tuple[List[int], List[int]]:
+    """
+        Create "negative" tokens for each given token in the vocabulary.
+
+        Args:
+            vocab_size (int): Vocabulary size of the text that is the subject.
+
+            count (int): The count of negatives words to match with each token
+                in the vocabulary.
+
+        Returns:
+            A tuple of lists. The first list is the list of token ids. The second
+            list, is a list of lists where each sublist is the collection of negative
+            words corresponding to the same indexed token in the first list.
+    """
+    return list(range(vocab_size)), [[np.random.randint(0, vocab_size) for l in range(count)] for k in range(vocab_size)]
 
 class SkipGram:
     """
@@ -52,7 +110,7 @@ class SkipGram:
                 lr (np.float32): Learning rate. No default values given.
         """
         new_input = self.core[input] - lr * self.core[self.vocab_size + negative]
-        new_negative = self.core[self.vocab_size - negative] + lr * self.core[input]
+        new_negative = self.core[self.vocab_size - negative] - lr * self.core[input]
         self.core[input] = new_input
         self.core[self.vocab_size + negative] = new_negative
 
@@ -81,7 +139,7 @@ class SkipGram:
                 e -= np.dot(self.core[input], self.core[self.vocab_size + context])
             for negative in negatives[i]:
                 e += np.dot(self.core[input], self.core[self.vocab_size + negative])
-        return e / (np.size(contexts) + np.size(negatives))
+        return e / (len(contexts) + len(negatives))
 
     def fit(self, inputs: List[int], contexts: List[List[int]], negatives: List[List[int]],
             epochs: int = 1, lr: np.float32 = 0.001, lr_decay: np.float32 = 1):

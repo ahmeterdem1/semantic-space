@@ -167,9 +167,9 @@ class NGram:
                 The loaded model as an NGram object.
         """
         with open(path, "rb") as file:
-            n = unpack("B", file.read(1))
-            vocab_size = unpack("I", file.read(4))
-            identifier = unpack("B", file.read(1))
+            n = unpack("B", file.read(1))[0]
+            vocab_size = unpack("I", file.read(4))[0]
+            identifier = unpack("B", file.read(1))[0]
 
             save_type: str
             dtype: numerical

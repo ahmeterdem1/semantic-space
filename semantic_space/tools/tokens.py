@@ -201,6 +201,32 @@ def tokenify(array: Union[List[int], Tuple[int]], ordered: bool = False, size: i
 
     return []
 
+def detokenify(tokens: List[Union[token16, token32]]) -> List[int]:
+    """
+        Turns a given ordered set of tokens into a Python list
+        of integers, representing their ids.
+
+        Args:
+            tokens: List of ordered tokens.
+
+        Returns:
+            Returns a list of integers, representing token ids. The
+            returned list has the same information as the initial
+            given set of ordered token list.
+    """
+    id_list = []
+
+    for token in tokens:
+        for i, position in enumerate(token.positions):
+            if i != 0 and position == 0:
+                break
+            while len(id_list) <= position:
+                id_list.append(-1)
+            id_list[position] = token.id
+
+    return id_list
+
+
 def save_tokens(array: Union[List[TOKEN], Tuple[TOKEN]],
                 destfile: str) -> None:
     """
@@ -257,10 +283,10 @@ def load_tokens(tokenfile: str) -> List[TOKEN]:
         with open(tokenfile, "rb") as file:
             data = file.read()
         data = decompress(data)
-        length = unpack("I", data[:4])
+        length = unpack("I", data[:4])[0]
         for i in range(1, length + 1):
             subdata = data[4 * i:4 * (i + 1)]
-            tokens.append(utoken16(unpack("H", subdata[:2]), unpack("H", subdata[2:])))
+            tokens.append(utoken16(unpack("H", subdata[:2])[0], unpack("H", subdata[2:])[0]))
         return tokens
 
     if tokenfile.endswith(".utoken_32"):
@@ -268,10 +294,10 @@ def load_tokens(tokenfile: str) -> List[TOKEN]:
         with open(tokenfile, "rb") as file:
             data = file.read()
         data = decompress(data)
-        length = unpack("I", data[:4])
+        length = unpack("I", data[:4])[0]
         for i in range(length):
             subdata = data[4 + 8 * i:4 + 8 * (i + 1)]
-            tokens.append(utoken16(unpack("I", subdata[:4]), unpack("I", subdata[4:])))
+            tokens.append(utoken16(unpack("I", subdata[:4])[0], unpack("I", subdata[4:])[0]))
         return tokens
 
     if tokenfile.endswith(".token_16"):
@@ -279,13 +305,13 @@ def load_tokens(tokenfile: str) -> List[TOKEN]:
         with open(tokenfile, "rb") as file:
             data = file.read()
         data = decompress(data)
-        length = unpack("I", data[:4])
+        length = unpack("I", data[:4])[0]
         for i in range(length):
             subdata = data[4 + 42 * i:4 + 42 * (i + 1)]
             positions = unpack("20H", subdata[:-2])
-            id = unpack("H", subdata[-2:])
+            id = unpack("H", subdata[-2:])[0]
             token = token16(id)
-            token.positions = positions
+            token.positions = (uint32 * 20)(*positions)
             tokens.append(token)
         return tokens
 
@@ -294,13 +320,13 @@ def load_tokens(tokenfile: str) -> List[TOKEN]:
         with open(tokenfile, "rb") as file:
             data = file.read()
         data = decompress(data)
-        length = unpack("I", data[:4])
+        length = unpack("I", data[:4])[0]
         for i in range(length):
             subdata = data[4 + 84 * i:4 + 84 * (i + 1)]
             positions = unpack("20I", subdata[:-4])
-            id = unpack("I", subdata[-4:])
+            id = unpack("I", subdata[-4:])[0]
             token = token16(id)
-            token.positions = positions
+            token.positions = (uint16 * 20)(*positions)
             tokens.append(token)
         return tokens
 
@@ -346,7 +372,9 @@ def vectorize(tokenlist: List[TOKEN], vocab_size: int, dtype: np.number = np.uin
 
         vectors = []
         for token in tokenlist:
-            for position in token.positions:
+            for i, position in enumerate(token.positions):
+                if i != 0 and position == 0:
+                    break
                 while len(vectors) <= position:
                     vectors.append(np.zeros((vocab_size,), dtype=dtype))
                 vectors[position][token.id] += 1
@@ -358,7 +386,9 @@ def vectorize(tokenlist: List[TOKEN], vocab_size: int, dtype: np.number = np.uin
 
         vectors = []
         for token in tokenlist:
-            for position in token.positions:
+            for i, position in enumerate(token.positions):
+                if i != 0 and position == 0:
+                    break
                 while len(vectors) <= position:
                     vectors.append(np.zeros((vocab_size,), dtype=dtype))
                 vectors[position][token.id] += 1
@@ -406,7 +436,7 @@ def chunkify(vectors: np.ndarray, start: int, stop: int, remove_special_tokens: 
                 collected.append(v)
             # If there is no [stop] at the end, it will not be included and collected
             # list will be formed as if it were there.
-    return np.asarray(collected)
+    return np.asarray(collected, dtype=object)
 
 def unorder(tokenlist: List[Union[token16, token32]]):
     """
@@ -417,6 +447,7 @@ def unorder(tokenlist: List[Union[token16, token32]]):
 
         Returns:
             A token array of utoken16/utoken32 types that is, unordered.
+            This process loses information.
     """
     maxima = -1
     id_token_match = {}
