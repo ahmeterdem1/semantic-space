@@ -214,17 +214,63 @@ def detokenify(tokens: List[Union[token16, token32]]) -> List[int]:
             returned list has the same information as the initial
             given set of ordered token list.
     """
-    id_list = []
+    max_position = 0
+    for token in tokens:
+        for i, position in enumerate(token.positions):
+            if i != 0 and position == 0:
+                break
+            if position > max_position:
+                max_position = position
+
+    id_list = [-1] * (max_position + 1)
 
     for token in tokens:
         for i, position in enumerate(token.positions):
             if i != 0 and position == 0:
                 break
-            while len(id_list) <= position:
-                id_list.append(-1)
             id_list[position] = token.id
 
     return id_list
+
+def divide(tokens: List[Union[token16, token32]], parts: int = 2) -> List[List[int]]:
+    """
+        Divides a large corpus of ordered tokens into smaller ordered
+        corpa. Preserves the original position information. A token
+        may get passed into nth division, but its original position
+        is preserved.
+
+        Args:
+            tokens: An ordered token list representing the corpus.
+
+            parts (int): The number to divide the corpus by. Default
+                is 2.
+    """
+
+    if parts < 2:
+        raise ArgumentError("Invalid range for 'parts'. Must be bigger than 2.")
+
+    max_position = 0
+    for token in tokens:
+        for i, position in enumerate(token.positions):
+            if i != 0 and position == 0:
+                break
+            if position > max_position:
+                max_position = position
+
+    targets = [[] for k in range(parts)]  # Do not EVER use "*" here.
+    delimiter = max_position // parts
+
+    for token in tokens:
+        for i, position in enumerate(token.positions):
+            if i != 0 and position == 0:
+                break
+            index = position // delimiter  # 0, 1, 2...
+            temp_position = position - index * delimiter  # Normalize and recenter the position
+            while len(targets[index]) <= temp_position:
+                targets.append(-1)
+            targets[index][temp_position] = position
+
+    return targets
 
 
 def save_tokens(array: Union[List[TOKEN], Tuple[TOKEN]],
@@ -311,7 +357,7 @@ def load_tokens(tokenfile: str) -> List[TOKEN]:
             positions = unpack("20H", subdata[:-2])
             id = unpack("H", subdata[-2:])[0]
             token = token16(id)
-            token.positions = (uint32 * 20)(*positions)
+            token.positions = (uint16 * 20)(*positions)
             tokens.append(token)
         return tokens
 
@@ -325,8 +371,8 @@ def load_tokens(tokenfile: str) -> List[TOKEN]:
             subdata = data[4 + 84 * i:4 + 84 * (i + 1)]
             positions = unpack("20I", subdata[:-4])
             id = unpack("I", subdata[-4:])[0]
-            token = token16(id)
-            token.positions = (uint16 * 20)(*positions)
+            token = token32(id)
+            token.positions = (uint32 * 20)(*positions)
             tokens.append(token)
         return tokens
 
